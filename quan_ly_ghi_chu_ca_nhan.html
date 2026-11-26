@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Notes - Quản lý ghi chú</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--primary:#5267df;--line:#e5e7eb;--green:#16865b;--red:#d94b4b;--amber:#b7791f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Arial,sans-serif}
+header{background:linear-gradient(120deg,#4357c9,#7184f0);color:white;padding:25px max(20px,calc((100% - 1180px)/2))}
+header h1{margin:0 0 5px;font-size:26px}header p{margin:0;opacity:.9}
+main{max-width:1180px;margin:24px auto;padding:0 18px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat,.panel,.note{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 3px 12px #17255408}
+.stat{padding:16px}.stat span{display:block;color:var(--muted);font-size:13px}.stat strong{font-size:25px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}.toolbar input{flex:1;min-width:210px}
+input,textarea,select{font:inherit;border:1px solid #d5d9e4;border-radius:9px;padding:11px;background:white;color:var(--text);width:100%}
+textarea{min-height:110px;resize:vertical}
+button{border:0;border-radius:9px;padding:10px 15px;font:600 14px Arial;cursor:pointer}
+.primary{background:var(--primary);color:white}.secondary{background:#eef0ff;color:#3e50bd}.danger{background:#fff0f0;color:var(--red)}.success{background:#e8f7ef;color:var(--green)}
+.layout{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
+.panel{padding:18px}.panel h2{font-size:18px;margin:0 0 15px}
+.field{margin-bottom:12px}.field label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+.form-actions{display:flex;gap:8px;flex-wrap:wrap}
+.list-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.list-head h2{margin:0}
+.notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.note{padding:15px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.note h3{margin:0;font-size:16px;overflow-wrap:anywhere}.note p{margin:0;color:#4b5563;white-space:pre-wrap;overflow-wrap:anywhere}
+.meta{display:flex;gap:7px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.tag{background:#eef0ff;color:#4858bd;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.tag.done{background:#e8f7ef;color:var(--green)}.tag.overdue{background:#fff0f0;color:var(--red)}
+.note-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto;padding-top:4px}.note-actions button{padding:8px 10px;font-size:12px}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:35px 10px;background:white;border:1px dashed #cbd0dc;border-radius:12px}
+.hint{font-size:12px;color:var(--muted);margin-top:12px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:25px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.notes{grid-template-columns:1fr}.list-head{align-items:flex-start;flex-direction:column}.stats{gap:9px}.stat{padding:12px}}
+</style>
+</head>
+<body>
+<header><h1>📝 Personal Notes</h1><p>Quản lý ghi chú cá nhân và lịch nhắc việc học tập</p></header>
+<main>
+  <section class="stats">
+    <div class="stat"><span>Tổng ghi chú</span><strong id="total">0</strong></div>
+    <div class="stat"><span>Chưa hoàn thành</span><strong id="pending">0</strong></div>
+    <div class="stat"><span>Đã hoàn thành</span><strong id="completed">0</strong></div>
+    <div class="stat"><span>Sắp đến hạn (3 ngày)</span><strong id="upcoming">0</strong></div>
+  </section>
+  <div class="toolbar">
+    <input id="search" placeholder="🔎 Tìm theo tiêu đề hoặc nội dung...">
+    <select id="filter" aria-label="Lọc ghi chú">
+      <option value="all">Tất cả ghi chú</option><option value="pending">Chưa hoàn thành</option>
+      <option value="done">Đã hoàn thành</option><option value="overdue">Quá hạn</option>
+    </select>
+    <select id="sort" aria-label="Sắp xếp">
+      <option value="newest">Mới tạo trước</option><option value="oldest">Cũ nhất trước</option>
+      <option value="due">Ngày nhắc gần nhất</option><option value="title">Theo tiêu đề A–Z</option>
+    </select>
+  </div>
+  <div class="layout">
+    <section class="panel">
+      <h2 id="formTitle">➕ Thêm ghi chú mới</h2>
+      <form id="noteForm">
+        <div class="field"><label for="title">Tiêu đề *</label><input id="title" required maxlength="90" placeholder="Ví dụ: Ôn tập Toán rời rạc"></div>
+        <div class="field"><label for="content">Nội dung ghi chú *</label><textarea id="content" required placeholder="Việc cần làm, nội dung cần nhớ..."></textarea></div>
+        <div class="field"><label for="category">Danh mục</label>
+          <select id="category"><option>Học tập</option><option>Bài tập</option><option>Thi cử</option><option>Cá nhân</option><option>Khác</option></select>
+        </div>
+        <div class="field"><label for="reminder">Ngày và giờ nhắc việc</label><input id="reminder" type="datetime-local"></div>
+        <div class="form-actions"><button class="primary" type="submit" id="saveBtn">Lưu ghi chú</button><button class="secondary" type="button" id="cancelBtn" hidden>Hủy sửa</button></div>
+      </form>
+      <p class="hint">Dữ liệu được lưu trên trình duyệt hiện tại bằng LocalStorage. Nhắc việc hiển thị trong ứng dụng khi bạn mở trang.</p>
+    </section>
+    <section>
+      <div class="list-head"><h2>📚 Danh sách ghi chú</h2><button class="secondary" id="resetDemo" type="button">Khôi phục 10 ghi chú mẫu</button></div>
+      <div class="notes" id="notes"></div>
+    </section>
+  </div>
+</main>
+<footer>Personal Notes • Lưu trữ cục bộ bằng LocalStorage • Dữ liệu không tự đồng bộ giữa các thiết bị</footer>
+<script>
+const KEY = "personalNotes_v1";
+const $ = id => document.getElementById(id);
+let notes = [];
+let editingId = null;
+
+function localDateTime(days, hour=19, minute=0) {
+  const d = new Date(); d.setDate(d.getDate()+days); d.setHours(hour,minute,0,0);
+  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+}
+function sampleNotes(){
+  const data=[
+    ["Ôn tập Toán rời rạc","Ôn lại Logic mệnh đề và các phép suy luận. Làm 5 bài tập trong đề cương.","Học tập",0,1],
+    ["Hoàn thành bài tập Java","Viết chương trình sử dụng vòng lặp for, chạy thử và ghi chú kết quả.","Bài tập",1,0],
+    ["Đọc bài 2 môn Tin học AI","Tóm tắt khái niệm trí tuệ nhân tạo, machine learning và ví dụ thực tế.","Học tập",1,0],
+    ["Ôn phần Đồ thị","Xem lại đỉnh, cạnh, đường đi và làm bài tập minh họa.","Thi cử",2,0],
+    ["Nộp bài thực hành Excel","Kiểm tra công thức tính tổng doanh thu và tra cứu dữ liệu trước khi nộp.","Bài tập",2,0],
+    ["Chuẩn bị thuyết trình","Lập dàn ý, chia nội dung thành các phần và luyện nói thử.","Học tập",3,0],
+    ["Đọc tài liệu môn học","Đọc 10 trang tài liệu và ghi lại các ý quan trọng.","Học tập",3,0],
+    ["Ôn tiếng Anh","Học 15 từ vựng mới và viết một đoạn văn ngắn.","Học tập",4,0],
+    ["Sắp xếp tài liệu học tập","Đặt tên file rõ ràng, phân loại bài giảng và bài tập theo môn.","Cá nhân",5,0],
+    ["Lập kế hoạch tuần mới","Kiểm tra lịch học, xác định bài cần ưu tiên và thời hạn hoàn thành.","Cá nhân",5,0]
+  ];
+  return data.map((x,i)=>({id:"demo-"+i,title:x[0],content:x[1],category:x[2],reminder:localDateTime(x[3],19),done:!!x[4],createdAt:Date.now()-(10-i)*86400000}));
+}
+function load(){
+  try { const raw=localStorage.getItem(KEY); notes=raw?JSON.parse(raw):sampleNotes(); if(!Array.isArray(notes)) notes=sampleNotes(); }
+  catch(e){notes=sampleNotes();}
+  save(); render();
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(notes));}
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function formatDate(value){
+  if(!value)return "Chưa đặt lịch nhắc";
+  const d=new Date(value); return isNaN(d)?"Ngày nhắc không hợp lệ":d.toLocaleString("vi-VN");
+}
+function isOverdue(n){return !!n.reminder && new Date(n.reminder)<new Date() && !n.done;}
+function render(){
+  $("total").textContent=notes.length;
+  $("pending").textContent=notes.filter(n=>!n.done).length;
+  $("completed").textContent=notes.filter(n=>n.done).length;
+  const now=new Date(), limit=new Date();limit.setDate(limit.getDate()+3);
+  $("upcoming").textContent=notes.filter(n=>!n.done&&n.reminder&&new Date(n.reminder)>=now&&new Date(n.reminder)<=limit).length;
+  const q=$("search").value.toLowerCase().trim(), filter=$("filter").value;
+  let shown=notes.filter(n=>(n.title+" "+n.content+" "+n.category).toLowerCase().includes(q));
+  if(filter==="pending")shown=shown.filter(n=>!n.done);
+  if(filter==="done")shown=shown.filter(n=>n.done);
+  if(filter==="overdue")shown=shown.filter(isOverdue);
+  const sort=$("sort").value;
+  shown.sort((a,b)=>sort==="oldest"?a.createdAt-b.createdAt:sort==="due"?(a.reminder||"9999").localeCompare(b.reminder||"9999"):sort==="title"?a.title.localeCompare(b.title,"vi"):b.createdAt-a.createdAt);
+  const root=$("notes");root.innerHTML="";
+  if(!shown.length){root.innerHTML='<div class="empty">Không tìm thấy ghi chú phù hợp.</div>';return;}
+  shown.forEach(n=>{
+    const article=document.createElement("article");article.className="note";
+    const status=n.done?'<span class="tag done">Đã hoàn thành</span>':isOverdue(n)?'<span class="tag overdue">Quá hạn</span>':'<span class="tag">Chưa hoàn thành</span>';
+    article.innerHTML=`<div class="meta"><span class="tag">${escapeHTML(n.category)}</span>${status}</div>
+      <h3>${escapeHTML(n.title)}</h3><p>${escapeHTML(n.content)}</p>
+      <div class="meta">⏰ ${escapeHTML(formatDate(n.reminder))}</div>
+      <div class="meta">Tạo: ${new Date(n.createdAt).toLocaleDateString("vi-VN")}</div>
+      <div class="note-actions">
+        <button class="success" data-action="toggle" data-id="${escapeHTML(n.id)}">${n.done?"Đánh dấu chưa xong":"Hoàn thành"}</button>
+        <button class="secondary" data-action="edit" data-id="${escapeHTML(n.id)}">Sửa</button>
+        <button class="danger" data-action="delete" data-id="${escapeHTML(n.id)}">Xóa</button>
+      </div>`;
+    root.appendChild(article);
+  });
+}
+$("noteForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const item={title:$("title").value.trim(),content:$("content").value.trim(),category:$("category").value,reminder:$("reminder").value};
+  if(!item.title||!item.content)return;
+  if(editingId){const n=notes.find(x=>x.id===editingId);if(n)Object.assign(n,item);}
+  else notes.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),...item,done:false,createdAt:Date.now()});
+  save();resetForm();render();
+});
+function resetForm(){editingId=null;$("noteForm").reset();$("formTitle").textContent="➕ Thêm ghi chú mới";$("saveBtn").textContent="Lưu ghi chú";$("cancelBtn").hidden=true;}
+$("cancelBtn").addEventListener("click",resetForm);
+$("notes").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-action]");if(!b)return;
+  const n=notes.find(x=>x.id===b.dataset.id);if(!n)return;
+  if(b.dataset.action==="toggle"){n.done=!n.done;save();render();}
+  if(b.dataset.action==="edit"){
+    editingId=n.id;$("title").value=n.title;$("content").value=n.content;$("category").value=n.category;$("reminder").value=n.reminder||"";
+    $("formTitle").textContent="✏️ Chỉnh sửa ghi chú";$("saveBtn").textContent="Cập nhật";$("cancelBtn").hidden=false;
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+  if(b.dataset.action==="delete"&&confirm("Bạn có chắc muốn xóa ghi chú này?")){notes=notes.filter(x=>x.id!==n.id);save();if(editingId===n.id)resetForm();render();}
+});
+["search","filter","sort"].forEach(id=>$(id).addEventListener(id==="search"?"input":"change",render));
+$("resetDemo").addEventListener("click",()=>{
+  if(confirm("Khôi phục 10 ghi chú mẫu? Các ghi chú hiện tại sẽ bị thay thế.")){notes=sampleNotes();save();resetForm();render();}
+});
+load();
+// Nhắc trong lúc trang đang mở; trình duyệt có thể giới hạn thông báo nếu tab bị đóng.
+if("Notification" in window && Notification.permission==="default"){
+  // Không tự xin quyền. Người dùng có thể bật thông báo trong cài đặt trình duyệt.
+}
+setInterval(()=>{
+  const now=new Date();
+  notes.filter(n=>!n.done&&n.reminder&&!n.notified&&Math.abs(new Date(n.reminder)-now)<30000).forEach(n=>{
+    n.notified=true;save();
+    if("Notification" in window && Notification.permission==="granted")new Notification("Đến giờ nhắc việc",{body:n.title});
+    else alert("Đến giờ nhắc việc: "+n.title);
+  });
+},30000);
+</script>
+</body>
+</html>
